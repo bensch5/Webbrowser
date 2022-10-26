@@ -1,6 +1,11 @@
 import sys
 import socket
 import ssl
+import tkinter
+
+WIDTH, HEIGHT = 1600, 900
+HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 100
 
 
 def request(url):
@@ -54,23 +59,62 @@ def request(url):
     return headers, body
 
 
-def show(body):
-    start_index = body.index("<body>")  # skip over html header tags
+def lex(body):
+    text = ""
     in_angle = False
-    for char in body[start_index:]:
+    for char in body:
         if char == "<":
             in_angle = True
         elif char == ">":
             in_angle = False
         elif not in_angle:
-            print(char, end="")
+            text += char
+    return text
 
 
-def load(url):
-    headers, body = request(url)
-    show(body)
+def layout(text):
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+    for char in text:
+        display_list.append((cursor_x, cursor_y, char))
+        cursor_x += HSTEP
+        if cursor_x >= WIDTH - HSTEP:
+            cursor_y += VSTEP
+            cursor_x = HSTEP
+    return display_list
+
+
+class Browser:
+    def __init__(self):
+        self.display_list = None
+        self.window = tkinter.Tk()
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas.pack()
+        self.scroll = 0
+        self.window.bind("<Down>", self.scroll_down)
+        self.window.bind("<Up>", self.scroll_up)
+
+    def load(self, url):
+        headers, body = request(url)
+        text = lex(body)
+        self.display_list = layout(text)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        for x, y, char in self.display_list:
+            if (y > self.scroll + HEIGHT) or (y + VSTEP < self.scroll): continue
+            self.canvas.create_text(x, y - self.scroll, text=char)
+
+    def scroll_down(self, e):
+        self.scroll += SCROLL_STEP
+        self.draw()
+
+    def scroll_up(self, e):
+        self.scroll -= SCROLL_STEP
+        self.draw()
 
 
 if __name__ == "__main__":
-    load(sys.argv[1])
-
+    Browser().load(sys.argv[1])
+    tkinter.mainloop()
