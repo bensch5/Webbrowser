@@ -140,6 +140,11 @@ class Layout:
             self.size += 4
         elif tag == "/big":
             self.size -= 4
+        elif tag == "br":
+            self.flush()
+        elif tag == "/p":
+            self.flush()
+            self.cursor_y += VSTEP
 
     def process_text(self, text):
         font = get_font(self.family, self.size, self.weight, self.style)
