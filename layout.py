@@ -1,4 +1,4 @@
-from browser import *
+from utils import *
 
 
 class Layout:
