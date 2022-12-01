@@ -19,6 +19,7 @@ class Browser:
     def load(self, url):
         headers, body = request(url)
         self.nodes = HTMLParser(body).parse()
+        style(self.nodes)
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.document.paint(self.display_list)

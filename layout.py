@@ -1,4 +1,5 @@
 from utils import *
+from parser import *
 
 
 def layout_mode(node):
@@ -110,10 +111,16 @@ class InlineLayout:
         self.cursor_y = baseline + 1.25 * max_descent
 
     def paint(self, display_list):
-        if isinstance(self.node, Element) and self.node.tag == "pre":
+        bg_color = self.node.style.get("background-color", "transparent")
+        if bg_color != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, "gray")
+            rect = DrawRect(self.x, self.y, x2, y2, bg_color)
             display_list.append(rect)
+
+        # if isinstance(self.node, Element) and self.node.tag == "pre":
+        #     x2, y2 = self.x + self.width, self.y + self.height
+        #     rect = DrawRect(self.x, self.y, x2, y2, "gray")
+        #     display_list.append(rect)
         for x, y, word, font in self.display_list:
             display_list.append(DrawText(x, y, word, font))
 
