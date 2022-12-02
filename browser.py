@@ -15,11 +15,26 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scroll_down)
         self.window.bind("<Up>", self.scroll_up)
+        with open("browser.css") as f:
+            self.default_style_sheet = CSSParser(f.read()).parse()
 
     def load(self, url):
         headers, body = request(url)
         self.nodes = HTMLParser(body).parse()
-        style(self.nodes)
+        rules = self.default_style_sheet.copy()
+        links = [node.attributes["href"]
+                 for node in tree_to_list(self.nodes, [])
+                 if isinstance(node, Element)
+                 and node.tag == "link"
+                 and "href" in node.attributes
+                 and node.attributes.get("rel") == "stylesheet"]
+        for link in links:
+            try:
+                header, body = request(resolve_url(link, url))
+            except:
+                continue
+            rules.extend(CSSParser(body).parse())
+        style(self.nodes, sorted(rules, key=cascade_priority))  # file order as tiebreaker
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.document.paint(self.display_list)
@@ -43,17 +58,6 @@ class Browser:
         if self.scroll >= SCROLL_STEP:  # do not go past top of the page
             self.scroll -= SCROLL_STEP
         self.draw()
-
-
-def style(node):
-    node.style = {}
-    if isinstance(node, Element) and "style" in node.attributes:
-        pairs = CSSParser(node.attributes["style"]).body()
-        for property, value in pairs.items():
-            node.style[property] = value
-
-    for child in node.children:
-        style(child)
 
 
 def main():
