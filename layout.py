@@ -48,8 +48,8 @@ class InlineLayout:
         self.line = []
         self.cursor_x = self.x
         self.cursor_y = self.y
-
         self.recurse(self.node)
+        self.flush()
         self.height = self.cursor_y - self.y
 
     def recurse(self, tree):

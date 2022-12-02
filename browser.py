@@ -1,6 +1,6 @@
 import sys
 from layout import *
-from parser import HTMLParser
+from parser import *
 from utils import *
 
 
@@ -43,6 +43,17 @@ class Browser:
         if self.scroll >= SCROLL_STEP:  # do not go past top of the page
             self.scroll -= SCROLL_STEP
         self.draw()
+
+
+def style(node):
+    node.style = {}
+    if isinstance(node, Element) and "style" in node.attributes:
+        pairs = CSSParser(node.attributes["style"]).body()
+        for property, value in pairs.items():
+            node.style[property] = value
+
+    for child in node.children:
+        style(child)
 
 
 def main():
