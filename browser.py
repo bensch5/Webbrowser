@@ -15,10 +15,30 @@ class Browser:
         self.scroll = 0
         self.window.bind("<Down>", self.scroll_down)
         self.window.bind("<Up>", self.scroll_up)
+        self.window.bind("<Button-1>", self.click)
         with open("browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
+        self.url = None
+
+    def click(self, e):
+        x, y = e.x, e.y
+        y += self.scroll
+        objs = [obj for obj in tree_to_list(self.document, [])
+                if obj.x <= x < obj.x + obj.width
+                and obj.y <= y < obj.y + obj.height]
+        if not objs:
+            return
+        elt = objs[-1].node
+        while elt:
+            if isinstance(elt, Text):
+                pass
+            elif elt.tag == "a" and "href" in elt.attributes:
+                url = resolve_url(elt.attributes["href"], self.url)
+                return self.load(url)
+            elt = elt.parent
 
     def load(self, url):
+        self.url = url
         headers, body = request(url)
         self.nodes = HTMLParser(body).parse()
         rules = self.default_style_sheet.copy()

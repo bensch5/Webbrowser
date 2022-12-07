@@ -73,10 +73,10 @@ def request(url):
     return headers, body
 
 
-def get_font(family, size, weight, slant):
-    key = (family, size, weight, slant)
+def get_font(size, weight, slant):
+    key = (size, weight, slant)
     if key not in FONTS:
-        font = tkinter.font.Font(family=family, size=size, weight=weight, slant=slant)
+        font = tkinter.font.Font(size=size, weight=weight, slant=slant)
         FONTS[key] = font
     return FONTS[key]
 
