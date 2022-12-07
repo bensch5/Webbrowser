@@ -1,14 +1,48 @@
 from utils import *
 
+INHERITED_PROPERTIES = {
+    "font-size": "16px",
+    "font-style": "normal",
+    "font-weight": "normal",
+    "color": "black",
+}
+
+
+def compute_style(node, property, value):
+    if property == "font-size":
+        if value.endswith("px"):
+            return value
+        elif value.endswith("%"):
+            if node.parent:
+                parent_font_size = node.parent.style["font-size"]
+            else:
+                parent_font_size = INHERITED_PROPERTIES["font-size"]
+            node_pct = float(value[:-1]) / 100
+            parent_px = float(parent_font_size[:-2])
+            return str(node_pct * parent_px) + "px"
+        else:
+            return None
+    else:
+        return value
+
 
 def style(node, rules):
     node.style = {}
+
+    for property, default_value in INHERITED_PROPERTIES.items():
+        if node.parent:
+            node.style[property] = node.parent.style[property]
+        else:
+            node.style[property] = default_value
 
     for selector, body in rules:
         if not selector.matches(node):
             continue
         for property, value in body.items():
-            node.style[property] = value
+            computed_value = compute_style(node, property, value)
+            if not computed_value:
+                continue
+            node.style[property] = computed_value
 
     if isinstance(node, Element) and "style" in node.attributes:
         pairs = CSSParser(node.attributes["style"]).body()
@@ -16,7 +50,7 @@ def style(node, rules):
             node.style[property] = value
 
     for child in node.children:
-        style(child)
+        style(child, rules)
 
 
 class HTMLParser:

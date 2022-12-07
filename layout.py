@@ -52,58 +52,40 @@ class InlineLayout:
         self.flush()
         self.height = self.cursor_y - self.y
 
-    def recurse(self, tree):
-        if isinstance(tree, Text):
-            self.text(tree.text)
+    def recurse(self, node):
+        if isinstance(node, Text):
+            self.text(node)
         else:
-            self.open_tag(tree.tag)
-            for child in tree.children:
+            if node.tag == "br":
+                self.flush()
+            for child in node.children:
                 self.recurse(child)
-            self.close_tag(tree.tag)
 
-    def open_tag(self, tag):
-        if tag == "i":
-            self.style = "italic"
-        elif tag == "b":
-            self.weight = "bold"
-        elif tag == "small":
-            self.size -= 2
-        elif tag == "big":
-            self.size += 4
-        elif tag == "br":
-            self.flush()
-
-    def close_tag(self, tag):
-        if tag == "i":
-            self.style = "roman"
-        elif tag == "b":
-            self.weight = "normal"
-        elif tag == "small":
-            self.size += 2
-        elif tag == "big":
-            self.size -= 4
-        elif tag == "p":
-            self.flush()
-            self.cursor_y += VSTEP
-
-    def text(self, text):
-        font = get_font(self.family, self.size, self.weight, self.style)
-        for word in text.split():  # remove white spaces
+    def text(self, node):
+        color = node.style["color"]
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        if style == "normal":
+            style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * 0.75)
+        font = get_font(self.family, size, weight, style)
+        for word in node.text.split():  # remove white spaces
             w = font.measure(word)  # width
-            if self.cursor_x + w > WIDTH - HSTEP: self.flush()
-            self.line.append((self.cursor_x, word, font))
+            if self.cursor_x + w > WIDTH - HSTEP:
+                self.flush()
+            self.line.append((self.cursor_x, word, font, color))
             self.cursor_x += w + font.measure(" ")
 
     def flush(self):
         if not self.line: return  # return if line is empty
 
-        metrics = [font.metrics() for x, word, font in self.line]
+        metrics = [font.metrics() for x, word, font, color in self.line]
         max_ascent = max([metric["ascent"] for metric in metrics])
         baseline = self.cursor_y + 1.25 * max_ascent
 
-        for x, word, font in self.line:
+        for x, word, font, color in self.line:
             y = baseline - font.metrics("ascent")
-            self.display_list.append((x, y, word, font))
+            self.display_list.append((x, y, word, font, color))
 
         self.line = []
         self.cursor_x = self.x
@@ -121,8 +103,8 @@ class InlineLayout:
         #     x2, y2 = self.x + self.width, self.y + self.height
         #     rect = DrawRect(self.x, self.y, x2, y2, "gray")
         #     display_list.append(rect)
-        for x, y, word, font in self.display_list:
-            display_list.append(DrawText(x, y, word, font))
+        for x, y, word, font, color in self.display_list:
+            display_list.append(DrawText(x, y, word, font, color))
 
 
 class BlockLayout:
@@ -188,11 +170,12 @@ class DocumentLayout:
 
 
 class DrawText:
-    def __init__(self, x1, y1, text, font):
+    def __init__(self, x1, y1, text, font, color):
         self.top = y1
         self.left = x1
         self.text = text
         self.font = font
+        self.color = color
         self.bottom = y1 + font.metrics("linespace")
 
     def execute(self, scroll, canvas):
@@ -200,6 +183,7 @@ class DrawText:
             self.left, self.top - scroll,
             text=self.text,
             font=self.font,
+            fill=self.color,
             anchor='nw',
         )
 

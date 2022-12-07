@@ -10,7 +10,7 @@ class Browser:
         self.display_list = []
         self.nodes = None
         self.window = tkinter.Tk()
-        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT)
+        self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, bg="white")
         self.canvas.pack()
         self.scroll = 0
         self.window.bind("<Down>", self.scroll_down)
