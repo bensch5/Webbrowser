@@ -6,22 +6,50 @@ from utils import *
 
 class Browser:
     def __init__(self):
-        self.document = None
-        self.display_list = []
-        self.nodes = None
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(self.window, width=WIDTH, height=HEIGHT, bg="white")
         self.canvas.pack()
+        self.window.bind("<Down>", self.handle_down)
+        self.window.bind("<Up>", self.handle_up)
+        self.window.bind("<Button-1>", self.handle_click)
+        self.tabs = []
+        self.active_tab = None
+
+    def handle_down(self, e):
+        self.tabs[self.active_tab].scroll_down()
+        self.draw()
+
+    def handle_up(self, e):
+        self.tabs[self.active_tab].scroll_up()
+        self.draw()
+
+    def handle_click(self, e):
+        self.tabs[self.active_tab].click(e.x, e.y)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        self.tabs[self.active_tab].draw(self.canvas)
+
+    def load(self, url):
+        new_tab = Tab()
+        new_tab.load(url)
+        self.active_tab = len(self.tabs)
+        self.tabs.append(new_tab)
+        self.draw()
+
+
+class Tab:
+    def __init__(self):
         self.scroll = 0
-        self.window.bind("<Down>", self.scroll_down)
-        self.window.bind("<Up>", self.scroll_up)
-        self.window.bind("<Button-1>", self.click)
+        self.url = None
+        self.document = None
+        self.display_list = []
+        self.nodes = None
         with open("browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
-        self.url = None
 
-    def click(self, e):
-        x, y = e.x, e.y
+    def click(self, x, y):
         y += self.scroll
         objs = [obj for obj in tree_to_list(self.document, [])
                 if obj.x <= x < obj.x + obj.width
@@ -58,26 +86,22 @@ class Browser:
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.document.paint(self.display_list)
-        self.draw()
 
-    def draw(self):
-        self.canvas.delete("all")
+    def draw(self, canvas):
         for cmd in self.display_list:
             if cmd.top > self.scroll + HEIGHT:
                 continue
             if cmd.bottom < self.scroll:
                 continue
-            cmd.execute(self.scroll, self.canvas)
+            cmd.execute(self.scroll, canvas)
 
-    def scroll_down(self, _e):
+    def scroll_down(self):
         max_y = self.document.height - HEIGHT
         self.scroll = min(self.scroll + SCROLL_STEP, max_y)  # do not go past bottom of the page
-        self.draw()
 
-    def scroll_up(self, _e):
+    def scroll_up(self):
         if self.scroll >= SCROLL_STEP:  # do not go past top of the page
             self.scroll -= SCROLL_STEP
-        self.draw()
 
 
 def main():
