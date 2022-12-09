@@ -1,4 +1,3 @@
-from utils import *
 from parser import *
 
 
@@ -51,8 +50,8 @@ class InlineLayout:
         if isinstance(node, Text):
             self.text(node)
         else:
-            if node.tag == "br":
-                self.flush()
+            # if node.tag == "br":
+            #     self.flush()
             for child in node.children:
                 self.recurse(child)
 

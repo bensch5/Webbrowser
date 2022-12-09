@@ -12,8 +12,12 @@ class Browser:
         self.window.bind("<Down>", self.handle_down)
         self.window.bind("<Up>", self.handle_up)
         self.window.bind("<Button-1>", self.handle_click)
+        self.window.bind("<Key>", self.handle_key)
+        self.window.bind("<Return>", self.handle_enter)
         self.tabs = []
         self.active_tab = None
+        self.focus = None
+        self.address_bar = ""
 
     def handle_down(self, e):
         self.tabs[self.active_tab].scroll_down()
@@ -24,12 +28,74 @@ class Browser:
         self.draw()
 
     def handle_click(self, e):
-        self.tabs[self.active_tab].click(e.x, e.y)
+        if e.y < CHROME_PX:
+            self.focus = None
+            if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
+                self.active_tab = int((e.x - 40) / 80)
+            elif 10 <= e.x < 35 and 40 <= e.y < 90:
+                self.tabs[self.active_tab].go_back()
+            elif 10 <= e.x < 30 and 10 <= e.y < 30:
+                self.load("https://browser.engineering/")
+            elif 50 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
+                self.focus = "address bar"
+                self.address_bar = ""
+        else:
+            self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
 
+    def handle_key(self, e):
+        if len(e.char) == 0: return
+        if not (0x20 <= ord(e.char) < 0x7f): return
+
+        if self.focus == "address bar":
+            self.address_bar += e.char
+            self.draw()
+
+    def handle_enter(self, e):
+        if self.focus == "address bar":
+            self.tabs[self.active_tab].load(self.address_bar)
+            self.focus = None
+            self.draw()
+
     def draw(self):
+        self.tabs[self.active_tab].draw(self.canvas)
+        self.canvas.create_rectangle(0, 0, WIDTH, CHROME_PX, fill="white", outline="black")
         self.canvas.delete("all")
         self.tabs[self.active_tab].draw(self.canvas)
+        tab_font = get_font(20, "normal", "roman")
+        for i, tab in enumerate(self.tabs):
+            name = "Tab {}".format(i)
+            x1, x2 = 40 + 80 * i, 120 + 80 * i
+            self.canvas.create_line(x1, 0, x1, 40, fill="black")
+            self.canvas.create_line(x2, 0, x2, 40, fill="black")
+            self.canvas.create_text(x1 + 10, 10, anchor="nw", text=name, font=tab_font, fill="black")
+            if i == self.active_tab:
+                self.canvas.create_line(0, 40, x1, 40, fill="black")
+                self.canvas.create_line(x2, 40, WIDTH, 40, fill="black")
+        button_font = get_font(26, "normal", "roman")
+        self.canvas.create_rectangle(10, 10, 30, 30,
+                                     outline="black", width=1)
+        self.canvas.create_text(11, 0, anchor="nw", text="+",
+                                font=button_font, fill="black")
+        self.canvas.create_rectangle(40, 50, WIDTH - 10, 90,
+                                     outline="black", width=1)
+        url = self.tabs[self.active_tab].url
+        self.canvas.create_text(55, 55, anchor='nw', text=url,
+                                font=button_font, fill="black")
+        self.canvas.create_rectangle(10, 50, 35, 90,
+                                     outline="black", width=1)
+        self.canvas.create_polygon(
+            15, 70, 30, 55, 30, 85, fill='black')
+        if self.focus == "address bar":
+            self.canvas.create_text(
+                55, 55, anchor='nw', text=self.address_bar,
+                font=button_font, fill="black")
+            w = button_font.measure(self.address_bar)
+            self.canvas.create_line(55 + w, 55, 55 + w, 85, fill="black")
+        else:
+            url = self.tabs[self.active_tab].url
+            self.canvas.create_text(55, 55, anchor='nw', text=url,
+                                    font=button_font, fill="black")
 
     def load(self, url):
         new_tab = Tab()
@@ -48,6 +114,7 @@ class Tab:
         self.nodes = None
         with open("browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
+        self.history = []
 
     def click(self, x, y):
         y += self.scroll
@@ -65,7 +132,14 @@ class Tab:
                 return self.load(url)
             elt = elt.parent
 
+    def go_back(self):
+        if len(self.history) > 1:
+            self.history.pop()
+            back = self.history.pop()
+            self.load(back)
+
     def load(self, url):
+        self.history.append(url)
         self.url = url
         headers, body = request(url)
         self.nodes = HTMLParser(body).parse()
@@ -89,14 +163,14 @@ class Tab:
 
     def draw(self, canvas):
         for cmd in self.display_list:
-            if cmd.top > self.scroll + HEIGHT:
+            if cmd.top > self.scroll + HEIGHT - CHROME_PX:
                 continue
             if cmd.bottom < self.scroll:
                 continue
-            cmd.execute(self.scroll, canvas)
+            cmd.execute(self.scroll - CHROME_PX, canvas)
 
     def scroll_down(self):
-        max_y = self.document.height - HEIGHT
+        max_y = self.document.height - (HEIGHT - CHROME_PX)
         self.scroll = min(self.scroll + SCROLL_STEP, max_y)  # do not go past bottom of the page
 
     def scroll_up(self):

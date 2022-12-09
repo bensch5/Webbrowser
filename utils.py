@@ -8,6 +8,7 @@ WIDTH, HEIGHT = 1600, 900
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
 FONTS = {}
+CHROME_PX = 100
 BLOCK_ELEMENTS = [
     "html", "body", "article", "section", "nav", "aside",
     "h1", "h2", "h3", "h4", "h5", "h6", "hgroup", "header",
