@@ -58,9 +58,8 @@ class Browser:
             self.draw()
 
     def draw(self):
-        self.tabs[self.active_tab].draw(self.canvas)
-        self.canvas.create_rectangle(0, 0, WIDTH, CHROME_PX, fill="white", outline="black")
         self.canvas.delete("all")
+        self.canvas.create_rectangle(0, 0, WIDTH, CHROME_PX, fill="white", outline="black")
         self.tabs[self.active_tab].draw(self.canvas)
         tab_font = get_font(20, "normal", "roman")
         for i, tab in enumerate(self.tabs):
@@ -159,6 +158,7 @@ class Tab:
         style(self.nodes, sorted(rules, key=cascade_priority))  # file order as tiebreaker
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
+        self.display_list = []
         self.document.paint(self.display_list)
 
     def draw(self, canvas):

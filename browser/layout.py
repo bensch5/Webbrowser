@@ -256,6 +256,9 @@ class DrawText:
             anchor='nw',
         )
 
+    def __repr__(self):
+        return self.text
+
 
 class DrawRect:
     def __init__(self, x1, y1, x2, y2, color):
