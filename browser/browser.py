@@ -15,6 +15,7 @@ class Browser:
         self.window.bind("<Up>", self.handle_up)
         self.window.bind("<Button-1>", self.handle_click)
         self.window.bind("<Key>", self.handle_key)
+        self.window.bind("<BackSpace>", self.handle_backspace)
         self.window.bind("<Return>", self.handle_enter)
         self.tabs = []
         self.active_tab = None
@@ -57,6 +58,14 @@ class Browser:
             self.tabs[self.active_tab].keypress(e.char)
             self.draw()
 
+    def handle_backspace(self, e):
+        if self.focus == "address bar":
+            self.address_bar = self.address_bar[:-1]
+            self.draw()
+        elif self.focus == "content":
+            self.tabs[self.active_tab].backspace()
+            self.draw()
+
     def handle_enter(self, e):
         if self.focus == "address bar":
             self.tabs[self.active_tab].load(self.address_bar)
@@ -84,9 +93,6 @@ class Browser:
                                 font=button_font, fill="black")
         self.canvas.create_rectangle(40, 50, WIDTH - 10, 90,
                                      outline="black", width=1)
-        url = self.tabs[self.active_tab].url
-        self.canvas.create_text(55, 55, anchor='nw', text=url,
-                                font=button_font, fill="black")
         self.canvas.create_rectangle(10, 50, 35, 90,
                                      outline="black", width=1)
         self.canvas.create_polygon(
@@ -174,6 +180,11 @@ class Tab:
     def keypress(self, char):
         if self.focus:
             self.focus.attributes["value"] += char
+            self.render()
+
+    def backspace(self):
+        if self.focus:
+            self.focus.attributes["value"] = self.focus.attributes["value"][:-1]
             self.render()
 
     def load(self, url, body=None):
