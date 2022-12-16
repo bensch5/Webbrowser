@@ -120,7 +120,11 @@ def do_login(session, params):
 
 def handle_connection(conx):
     req = conx.makefile("b")
-    reqline = req.readline().decode('utf8')
+    reqline = req.readline()
+    try:
+        reqline = reqline.decode('utf8')
+    except UnicodeError:
+        reqline = reqline.decode('ISO-8859-1')
     method, url, version = reqline.split(" ", 2)
     assert method in ["GET", "POST"]
 
@@ -160,17 +164,22 @@ def handle_connection(conx):
     conx.close()
 
 
-s = socket.socket(
-    family=socket.AF_INET,
-    type=socket.SOCK_STREAM,
-    proto=socket.IPPROTO_TCP,
-)
+def main():
+    s = socket.socket(
+        family=socket.AF_INET,
+        type=socket.SOCK_STREAM,
+        proto=socket.IPPROTO_TCP,
+    )
 
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-s.bind(('', 8000))
-s.listen()
+    s.bind(('', 8000))
+    s.listen()
 
-while True:
-    conx, addr = s.accept()
-    handle_connection(conx)
+    while True:
+        conx, addr = s.accept()
+        handle_connection(conx)
+
+
+if __name__ == "__main__":
+    main()
