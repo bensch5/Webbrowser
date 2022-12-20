@@ -6,10 +6,11 @@ def layout_mode(node):
         return "inline"
     elif node.children:
         for child in node.children:
-            if isinstance(child, Text):
-                continue
+            if isinstance(child, Text): continue
             if child.tag in BLOCK_ELEMENTS:
                 return "block"
+        return "inline"
+    elif node.tag == "input":
         return "inline"
     else:
         return "block"
@@ -21,10 +22,10 @@ class InlineLayout:
         self.style = "roman"
         self.size = 16
         self.cursor_x = None
-        self.x = None
-        self.y = None
-        self.width = None
-        self.height = None
+        self.x = 0
+        self.y = 0
+        self.width = 0
+        self.height = 0
         self.node = node
         self.parent = parent
         self.previous = previous
@@ -46,23 +47,28 @@ class InlineLayout:
             line.layout()
         self.height = sum([line.height for line in self.children])
 
-    def recurse(self, node):
-        if isinstance(node, Text):
-            self.text(node)
-        else:
-            # if node.tag == "br":
-            #     self.flush()
-            for child in node.children:
-                self.recurse(child)
-
-    def text(self, node):
-        color = node.style["color"]
+    def get_font(self, node):
         weight = node.style["font-weight"]
         style = node.style["font-style"]
         if style == "normal":
             style = "roman"
         size = int(float(node.style["font-size"][:-2]) * 0.75)
-        font = get_font(size, weight, style)
+        return get_font(size, weight, style)
+
+    def recurse(self, node):
+        if isinstance(node, Text):
+            self.text(node)
+        else:
+            if node.tag == "br":
+                self.new_line()
+            elif node.tag == "input" or node.tag == "button":
+                self.input(node)
+            else:
+                for child in node.children:
+                    self.recurse(child)
+
+    def text(self, node):
+        font = self.get_font(node)
         for word in node.text.split():  # remove white spaces
             w = font.measure(word)  # width
             if self.cursor_x + w > WIDTH - HSTEP:
@@ -80,21 +86,16 @@ class InlineLayout:
         new_line = LineLayout(self.node, self, last_line)
         self.children.append(new_line)
 
-    # def flush(self):
-    #     if not self.line: return  # return if line is empty
-    #
-    #     metrics = [font.metrics() for x, word, font, color in self.line]
-    #     max_ascent = max([metric["ascent"] for metric in metrics])
-    #     baseline = self.cursor_y + 1.25 * max_ascent
-    #
-    #     for x, word, font, color in self.line:
-    #         y = baseline - font.metrics("ascent")
-    #         self.display_list.append((x, y, word, font, color))
-    #
-    #     self.line = []
-    #     self.cursor_x = self.x
-    #     max_descent = max([metric["descent"] for metric in metrics])
-    #     self.cursor_y = baseline + 1.25 * max_descent
+    def input(self, node):
+        w = INPUT_WIDTH_PX
+        if self.cursor_x + w > self.x + self.width:
+            self.new_line()
+        line = self.children[-1]
+        input = InputLayout(node, line, self.previous_word)
+        line.children.append(input)
+        self.previous_word = input
+        font = self.get_font(node)
+        self.cursor_x += w + font.measure(" ")
 
     def paint(self, display_list):
         bg_color = self.node.style.get("background-color", "transparent")
@@ -103,16 +104,17 @@ class InlineLayout:
             rect = DrawRect(self.x, self.y, x2, y2, bg_color)
             display_list.append(rect)
 
-        # if isinstance(self.node, Element) and self.node.tag == "pre":
-        #     x2, y2 = self.x + self.width, self.y + self.height
-        #     rect = DrawRect(self.x, self.y, x2, y2, "gray")
-        #     display_list.append(rect)
-
-        # for x, y, word, font, color in self.display_list:
-        #     display_list.append(DrawText(x, y, word, font, color))
-
         for child in self.children:
             child.paint(display_list)
+
+        is_atomic = not isinstance(self.node, Text) and \
+                    (self.node.tag == "input" or self.node.tag == "button")
+
+        if not is_atomic:
+            if bg_color != "transparent":
+                x2, y2 = self.x + self.width, self.y + self.height
+                rect = DrawRect(self.x, self.y, x2, y2, bg_color)
+                display_list.append(rect)
 
 
 class LineLayout:
@@ -132,8 +134,7 @@ class LineLayout:
             self.y = self.parent.y
         for word in self.children:
             word.layout()
-        max_ascent = max([word.font.metrics("ascent")
-                          for word in self.children])
+        max_ascent = max([word.font.metrics("ascent") for word in self.children])
         baseline = self.y + 1.25 * max_ascent
         for word in self.children:
             word.y = baseline - word.font.metrics("ascent")
@@ -178,10 +179,10 @@ class TextLayout:
 
 class BlockLayout:
     def __init__(self, node, parent, previous):
-        self.x = None
-        self.y = None
-        self.height = None
-        self.width = None
+        self.x = 0
+        self.y = 0
+        self.height = 0
+        self.width = 0
         self.node = node
         self.parent = parent
         self.previous = previous
@@ -238,40 +239,35 @@ class DocumentLayout:
         self.children[0].paint(display_list)
 
 
-class DrawText:
-    def __init__(self, x1, y1, text, font, color):
-        self.top = y1
-        self.left = x1
-        self.text = text
-        self.font = font
-        self.color = color
-        self.bottom = y1 + font.metrics("linespace")
-
-    def execute(self, scroll, canvas):
-        canvas.create_text(
-            self.left, self.top - scroll,
-            text=self.text,
-            font=self.font,
-            fill=self.color,
-            anchor='nw',
-        )
-
-    def __repr__(self):
-        return self.text
+INPUT_WIDTH_PX = 200
 
 
-class DrawRect:
-    def __init__(self, x1, y1, x2, y2, color):
-        self.top = y1
-        self.left = x1
-        self.bottom = y2
-        self.right = x2
-        self.color = color
+class InputLayout:
+    def __init__(self, node, parent, previous):
+        self.x = 0
+        self.y = 0
+        self.width = INPUT_WIDTH_PX
+        self.height = 0
+        self.font = get_font(10, "normal", "roman")
+        self.node = node
+        self.children = []
+        self.parent = parent
+        self.previous = previous
 
-    def execute(self, scroll, canvas):
-        canvas.create_rectangle(
-            self.left, self.top - scroll,
-            self.right, self.bottom - scroll,
-            width=0,
-            fill=self.color,
-        )
+    def layout(self):
+        pass
+
+    def paint(self, display_list):
+        bg_color = self.node.style.get("background-color", "transparent")
+        if bg_color != "transparent":
+            x2, y2 = self.x + self.width, self.y + self.height
+            rect = DrawRect(self.x, self.y, x2, y2, bg_color)
+            display_list.append(rect)
+        text = ""
+        if self.node.tag == "input":
+            text = self.node.attributes.get("value", "")
+        elif self.node.tag == "button":
+            text = self.node.children[0].text
+
+        color = self.node.style["color"]
+        display_list.append(DrawText(self.x, self.y, text, self.font, color))

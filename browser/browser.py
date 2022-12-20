@@ -1,4 +1,6 @@
 import sys
+import urllib.parse
+
 from layout import *
 from parser import *
 from utils import *
@@ -13,6 +15,7 @@ class Browser:
         self.window.bind("<Up>", self.handle_up)
         self.window.bind("<Button-1>", self.handle_click)
         self.window.bind("<Key>", self.handle_key)
+        self.window.bind("<BackSpace>", self.handle_backspace)
         self.window.bind("<Return>", self.handle_enter)
         self.tabs = []
         self.active_tab = None
@@ -40,6 +43,7 @@ class Browser:
                 self.focus = "address bar"
                 self.address_bar = ""
         else:
+            self.focus = "content"
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
 
@@ -49,6 +53,17 @@ class Browser:
 
         if self.focus == "address bar":
             self.address_bar += e.char
+            self.draw()
+        elif self.focus == "content":
+            self.tabs[self.active_tab].keypress(e.char)
+            self.draw()
+
+    def handle_backspace(self, e):
+        if self.focus == "address bar":
+            self.address_bar = self.address_bar[:-1]
+            self.draw()
+        elif self.focus == "content":
+            self.tabs[self.active_tab].backspace()
             self.draw()
 
     def handle_enter(self, e):
@@ -78,9 +93,6 @@ class Browser:
                                 font=button_font, fill="black")
         self.canvas.create_rectangle(40, 50, WIDTH - 10, 90,
                                      outline="black", width=1)
-        url = self.tabs[self.active_tab].url
-        self.canvas.create_text(55, 55, anchor='nw', text=url,
-                                font=button_font, fill="black")
         self.canvas.create_rectangle(10, 50, 35, 90,
                                      outline="black", width=1)
         self.canvas.create_polygon(
@@ -106,6 +118,7 @@ class Browser:
 
 class Tab:
     def __init__(self):
+        self.rules = None
         self.scroll = 0
         self.url = None
         self.document = None
@@ -114,6 +127,7 @@ class Tab:
         with open("browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
         self.history = []
+        self.focus = None
 
     def click(self, x, y):
         y += self.scroll
@@ -129,7 +143,33 @@ class Tab:
             elif elt.tag == "a" and "href" in elt.attributes:
                 url = resolve_url(elt.attributes["href"], self.url)
                 return self.load(url)
+            elif elt.tag == "input":
+                self.focus = elt
+                elt.attributes["value"] = ""
+                return self.render()
+            elif elt.tag == "button":
+                while elt:
+                    if elt.tag == "form" and "action" in elt.attributes:
+                        return self.submit_form(elt)
+                    elt = elt.parent
             elt = elt.parent
+
+    def submit_form(self, elt):
+        inputs = [node for node in tree_to_list(elt, [])
+                  if isinstance(node, Element)
+                  and node.tag == "input"
+                  and "name" in node.attributes]
+
+        body = ""
+        for input in inputs:
+            name = input.attributes["name"]
+            value = input.attributes.get("value", "")
+            name = urllib.parse.quote(name)
+            value = urllib.parse.quote(value)
+            body += "&" + name + "=" + value
+        body = body[1:]
+        url = resolve_url(elt.attributes["action"], self.url)
+        self.load(url, body)
 
     def go_back(self):
         if len(self.history) > 1:
@@ -137,12 +177,22 @@ class Tab:
             back = self.history.pop()
             self.load(back)
 
-    def load(self, url):
+    def keypress(self, char):
+        if self.focus:
+            self.focus.attributes["value"] += char
+            self.render()
+
+    def backspace(self):
+        if self.focus:
+            self.focus.attributes["value"] = self.focus.attributes["value"][:-1]
+            self.render()
+
+    def load(self, url, body=None):
         self.history.append(url)
         self.url = url
-        headers, body = request(url)
+        headers, body = request(url, body)
         self.nodes = HTMLParser(body).parse()
-        rules = self.default_style_sheet.copy()
+        self.rules = self.default_style_sheet.copy()
         links = [node.attributes["href"]
                  for node in tree_to_list(self.nodes, [])
                  if isinstance(node, Element)
@@ -154,8 +204,11 @@ class Tab:
                 header, body = request(resolve_url(link, url))
             except:
                 continue
-            rules.extend(CSSParser(body).parse())
-        style(self.nodes, sorted(rules, key=cascade_priority))  # file order as tiebreaker
+            self.rules.extend(CSSParser(body).parse())
+        self.render()
+
+    def render(self):
+        style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.display_list = []
@@ -167,7 +220,15 @@ class Tab:
                 continue
             if cmd.bottom < self.scroll:
                 continue
-            cmd.execute(self.scroll - CHROME_PX, canvas)
+            cmd.execute(self.scroll - CHROME_PX - 25, canvas)
+        if self.focus:
+            obj = [obj for obj in tree_to_list(self.document, [])
+                   if obj.node == self.focus and \
+                   isinstance(obj, InputLayout)][0]
+            text = self.focus.attributes.get("value", "")
+            x = obj.x + obj.font.measure(text)
+            y = obj.y - self.scroll + CHROME_PX
+            canvas.create_line(x, y, x, y + obj.height)
 
     def scroll_down(self):
         max_y = self.document.height - (HEIGHT - CHROME_PX)

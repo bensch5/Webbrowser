@@ -19,7 +19,7 @@ BLOCK_ELEMENTS = [
 ]
 
 
-def request(url):
+def request(url, payload=None):
     scheme, url = url.split("://", 1)
     assert scheme in ["http", "https", "file"], "Unknown scheme {}".format(scheme)
 
@@ -51,8 +51,18 @@ def request(url):
             ctx = ssl.create_default_context()
             s = ctx.wrap_socket(s, server_hostname=host)
 
-        s.send("GET {} HTTP/1.0\r\n".format(path).encode("utf8") +
-               "Host: {}\r\n\r\n".format(host).encode("utf8"))
+        method = "POST" if payload else "GET"
+        req = "{} {} HTTP/1.0\r\n".format(method, path)
+        req += "Host: {}\r\n".format(host)
+
+        if payload:
+            length = len(payload.encode("utf8"))
+            req += "Content-Length: {}\r\n".format(length)
+            req += "\r\n" + payload
+        else:
+            req += "\r\n"
+
+        s.send(req.encode("utf8"))
         response = s.makefile("r", encoding="utf8", newline="\r\n")
         status_line = response.readline()
         version, status, explanation = status_line.split(" ", 2)
@@ -101,6 +111,45 @@ class Element:
 
     def __repr__(self):
         return "<" + self.tag + ">"
+
+
+class DrawText:
+    def __init__(self, x1, y1, text, font, color):
+        self.top = y1
+        self.left = x1
+        self.text = text
+        self.font = font
+        self.color = color
+        self.bottom = y1 + font.metrics("linespace")
+
+    def execute(self, scroll, canvas):
+        canvas.create_text(
+            self.left, self.top - scroll,
+            text=self.text,
+            font=self.font,
+            fill=self.color,
+            anchor='nw',
+        )
+
+    def __repr__(self):
+        return self.text
+
+
+class DrawRect:
+    def __init__(self, x1, y1, x2, y2, color):
+        self.top = y1
+        self.left = x1
+        self.bottom = y2
+        self.right = x2
+        self.color = color
+
+    def execute(self, scroll, canvas):
+        canvas.create_rectangle(
+            self.left, self.top - scroll,
+            self.right, self.bottom - scroll,
+            width=0,
+            fill=self.color,
+        )
 
 
 def print_tree(node, indent=0):
