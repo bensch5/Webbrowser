@@ -218,10 +218,10 @@ class BlockLayout:
 
 class DocumentLayout:
     def __init__(self, node):
-        self.x = None
-        self.y = None
-        self.height = None
-        self.width = None
+        self.x = 0
+        self.y = 0
+        self.height = 0
+        self.width = 0
         self.node = node
         self.parent = None
         self.children = []
@@ -244,30 +244,53 @@ INPUT_WIDTH_PX = 200
 
 class InputLayout:
     def __init__(self, node, parent, previous):
-        self.x = 0
-        self.y = 0
-        self.width = INPUT_WIDTH_PX
-        self.height = 0
-        self.font = get_font(10, "normal", "roman")
         self.node = node
         self.children = []
         self.parent = parent
         self.previous = previous
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
 
     def layout(self):
-        pass
+        weight = self.node.style["font-weight"]
+        style = self.node.style["font-style"]
+        if style == "normal": style = "roman"
+        size = int(float(self.node.style["font-size"][:-2]) * .75)
+        self.font = get_font(size, weight, style)
+
+        self.width = INPUT_WIDTH_PX
+
+        if self.previous:
+            space = self.previous.font.measure(" ")
+            self.x = self.previous.x + space + self.previous.width
+        else:
+            self.x = self.parent.x
+
+        self.height = self.font.metrics("linespace")
 
     def paint(self, display_list):
-        bg_color = self.node.style.get("background-color", "transparent")
-        if bg_color != "transparent":
+        bgcolor = self.node.style.get("background-color",
+                                      "transparent")
+        if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, bg_color)
+            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             display_list.append(rect)
-        text = ""
+
         if self.node.tag == "input":
             text = self.node.attributes.get("value", "")
         elif self.node.tag == "button":
             text = self.node.children[0].text
 
         color = self.node.style["color"]
-        display_list.append(DrawText(self.x, self.y, text, self.font, color))
+        display_list.append(
+            DrawText(self.x, self.y, text, self.font, color))
+
+    def __repr__(self):
+        if self.node.tag == "input":
+            extra = "type=input"
+        else:
+            extra = "type=button text={}".format(self.node.children[0].text)
+        return "InputLayout(x={}, y={}, width={}, height={}, {})".format(
+            self.x, self.y, self.width, self.height, extra)
