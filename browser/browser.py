@@ -41,7 +41,7 @@ class Browser:
                 self.load("https://browser.engineering/")
             elif 50 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
                 self.focus = "address bar"
-                self.address_bar = ""
+                self.address_bar = self.tabs[self.active_tab].url
         else:
             self.focus = "content"
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
@@ -220,7 +220,7 @@ class Tab:
                 continue
             if cmd.bottom < self.scroll:
                 continue
-            cmd.execute(self.scroll - CHROME_PX - 25, canvas)
+            cmd.execute(self.scroll - CHROME_PX, canvas)
         if self.focus:
             obj = [obj for obj in tree_to_list(self.document, [])
                    if obj.node == self.focus and \
