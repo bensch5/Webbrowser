@@ -5,6 +5,7 @@ from layout import *
 from parser import *
 from utils import *
 
+DEFAULT_PAGE = "https://browser.engineering/"
 
 class Browser:
     def __init__(self):
@@ -38,7 +39,7 @@ class Browser:
             elif 10 <= e.x < 35 and 40 <= e.y < 90:
                 self.tabs[self.active_tab].go_back()
             elif 10 <= e.x < 30 and 10 <= e.y < 30:
-                self.load("https://browser.engineering/")
+                self.load(DEFAULT_PAGE)
             elif 50 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
                 self.focus = "address bar"
                 self.address_bar = self.tabs[self.active_tab].url
@@ -240,7 +241,11 @@ class Tab:
 
 
 def main():
-    Browser().load(sys.argv[1])
+    if len(sys.argv) > 1:
+        url = sys.argv[1]
+    else:
+        url = DEFAULT_PAGE
+    Browser().load(url)
     tkinter.mainloop()
 
 
